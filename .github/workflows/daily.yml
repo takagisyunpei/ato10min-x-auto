@@ -1,0 +1,29 @@
+name: Schedule 8 X posts
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "50 21 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  schedule-posts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Schedule today's posts in Buffer
+        env:
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+          BUFFER_CHANNEL_NAME: 10min_kaiketsu
+        run: python buffer_scheduler.py
