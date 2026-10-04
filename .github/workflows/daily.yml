@@ -1,29 +1,50 @@
-name: Schedule 8 X posts
+name: あと10分で解決 X Daily Auto Posts
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "50 21 * * *"
+    - cron: "0 21 * * *"   # 日本時間 06:00
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  schedule-posts:
+  generate-and-schedule:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Schedule today's posts in Buffer
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate daily posts
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_TEXT_MODEL: gpt-5.6-luna
+        run: python generate_daily.py
+
+      - name: Commit generated files
+        run: |
+          git config user.name "10min Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add daily_payload.json history.json generated_media
+          git diff --cached --quiet || git commit -m "Daily X content"
+          git push
+          echo "MEDIA_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Schedule Buffer posts
         env:
           BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
           BUFFER_CHANNEL_NAME: 10min_kaiketsu
-        run: python buffer_scheduler.py
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          MEDIA_SHA: ${{ env.MEDIA_SHA }}
+          NOTE_URL: ${{ vars.NOTE_URL }}
+        run: python schedule_buffer.py
